@@ -5,7 +5,7 @@ Stage 0:
 1.b
 	It is dequeued when the task_waitall function is called,
 	that is either at the end of the runtime or when the runtime executes
-	 a set of tasks (in the body of the task_waitall function).
+	a set of tasks (in the body of the task_waitall function).
 
 2.
 INIT 	-> 	at the initialization / creation
@@ -17,5 +17,9 @@ TERMINATED ->   when terminate_task is called, purely to indicate that the task 
 Stage 1:
 -------
 
-1.
-	The thread pool is created at the initialization of the runtime.
+1. The thread pool is created at the initialization of the runtime.
+2. It checks for a ready task to be executed, dequeue it from the task_queue, executes it and return a value, then goes back to checking
+   if there are ready tasks waiting to be executed.
+3. Producer / Consumer
+4. If the queue gets full we should first execute one of the task in it, to allow another one to be put in its place.
+5. When the task queue is empty.

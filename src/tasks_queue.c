@@ -30,7 +30,7 @@ void free_tasks_queue(tasks_queue_t *q)
 void enqueue_task(tasks_queue_t *q, task_t *t)
 {
     if(q->index == q->task_buffer_size){
-        fprintf(stderr,"ERROR: the queue of tasks is full\n");
+        fprintf(stderr, "ERROR: the queue of tasks is full\n");
         exit(EXIT_FAILURE);
     }
 
@@ -50,4 +50,3 @@ task_t* dequeue_task(tasks_queue_t *q)
 
     return t;
 }
-
