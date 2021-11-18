@@ -29,13 +29,21 @@ void free_tasks_queue(tasks_queue_t *q)
 
 void enqueue_task(tasks_queue_t *q, task_t *t)
 {
-    if(q->index == q->task_buffer_size){
-        fprintf(stderr, "ERROR: the queue of tasks is full\n");
-        exit(EXIT_FAILURE);
-    }
+    pthread_mutex_lock(&m);
 
+    while (q->index == q->task_buffer_size)
+    {
+        pthread_cond_wait(&full, &m);
+    }
     q->task_buffer[q->index] = t;
     q->index++;
+        
+    pthread_cond_signal(&empty);
+    pthread_mutex_unlock(&m);
+   /*  if(q->index == q->task_buffer_size){
+        fprintf(stderr, "ERROR: the queue of tasks is full\n");
+        exit(EXIT_FAILURE);
+    } */
 }
 
 

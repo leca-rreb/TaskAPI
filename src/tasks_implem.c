@@ -6,7 +6,7 @@
 #include "debug.h"
 
 tasks_queue_t *tqueue= NULL;
-pthread_t *tids = NULL;
+pthread_t tids[THREAD_COUNT];
 
 pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t full = PTHREAD_COND_INITIALIZER;
