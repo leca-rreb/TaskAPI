@@ -19,7 +19,8 @@ void runtime_init(void)
     create_queues();
     create_thread_pool();
 
-    sys_state.task_counter = 0;    
+    sys_state.task_counter = 0;
+    sys_state.task_terminated = 0;    
 }
 
 void runtime_init_with_deps(void)
@@ -87,20 +88,8 @@ void submit_task(task_t *t)
 
 void task_waitall(void)
 {
-    active_task = get_task_to_execute();
-
-    while(active_task != NULL){
-        task_return_value_t ret = exec_task(active_task);
-
-        if (ret == TASK_COMPLETED){
-            terminate_task(active_task);
-        }
-#ifdef WITH_DEPENDENCIES
-        else{
-            active_task->status = WAITING;
-        }
-#endif
-
-        active_task = get_task_to_execute();
+   
+    while(!tasks_completed()){
+        
     }
 }

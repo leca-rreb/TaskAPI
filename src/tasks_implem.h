@@ -14,5 +14,6 @@ unsigned int exec_task(task_t *t);
 void terminate_task(task_t *t);
 
 void task_check_runnable(task_t *t);
+int tasks_completed(void);
 
 #endif

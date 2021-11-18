@@ -2,6 +2,7 @@
 #include <pthread.h>
 
 #include "tasks_implem.h"
+#include "tasks.h"
 #include "tasks_queue.h"
 #include "debug.h"
 
@@ -27,6 +28,7 @@ void *thread_routine(void *arg)
         task_return_value_t ret = exec_task(active_task);
         if (ret == TASK_COMPLETED) {
             terminate_task(active_task);
+            sys_state.task_terminated++;
         }
         pthread_cond_signal(&full);
         pthread_mutex_unlock(&m);
@@ -46,7 +48,6 @@ void delete_queues(void)
 
 void create_thread_pool(void)
 {
-
     for (size_t i = 0; i < THREAD_COUNT; i++)
     {
         pthread_create(&tids[i], NULL, thread_routine, NULL);
@@ -63,6 +64,15 @@ void dispatch_task(task_t *t)
 task_t* get_task_to_execute(void)
 {
     return dequeue_task(tqueue);
+}
+
+int tasks_completed(void)
+{
+    //printf("%ld", sys_state.task_counter);
+    if(sys_state.task_terminated == sys_state.task_counter){
+        return 1;
+    }
+    return 0;
 }
 
 unsigned int exec_task(task_t *t)

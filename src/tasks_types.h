@@ -53,6 +53,7 @@ typedef struct task{
 
 typedef struct system_state{
     long unsigned int task_counter;
+    long unsigned int task_terminated;
 } system_state_t;
 
 
