@@ -10,6 +10,7 @@ tasks_queue_t *tqueue= NULL;
 pthread_t tids[THREAD_COUNT];
 
 pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t m2 = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t full = PTHREAD_COND_INITIALIZER;
 pthread_cond_t  empty = PTHREAD_COND_INITIALIZER;
 
@@ -23,15 +24,24 @@ void *thread_routine(void *arg)
         {
             pthread_cond_wait(&empty, &m);
         }
-
         active_task = get_task_to_execute();
-        task_return_value_t ret = exec_task(active_task);
-        if (ret == TASK_COMPLETED) {
-            terminate_task(active_task);
-            sys_state.task_terminated++;
-        }
         pthread_cond_signal(&full);
         pthread_mutex_unlock(&m);
+        pthread_mutex_lock(&m2);
+        task_return_value_t ret = exec_task(active_task);
+        
+        if (ret == TASK_COMPLETED) {
+            
+            terminate_task(active_task);
+           
+            sys_state.task_terminated++;
+        }
+#ifdef WITH_DEPENDENCIES
+    else{
+        active_task->status = WAITING;
+    }
+#endif
+        pthread_mutex_unlock(&m2);
     }
     
 }
