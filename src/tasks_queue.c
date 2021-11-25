@@ -11,6 +11,9 @@ tasks_queue_t *create_tasks_queue(void)
     q->task_buffer_size = QUEUE_SIZE;
     q->task_buffer = (task_t **) malloc(q->task_buffer_size * sizeof(task_t *));
     q->index = 0;
+    q->m = (pthread_mutex_t) PTHREAD_MUTEX_INITIALIZER;
+    q->full = (pthread_cond_t) PTHREAD_COND_INITIALIZER;
+    q->empty = (pthread_cond_t) PTHREAD_COND_INITIALIZER;
 
     return q;
 

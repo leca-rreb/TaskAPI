@@ -12,48 +12,48 @@ pthread_t tids[THREAD_COUNT];
 tasks_queue_t **tqueue = NULL;
 int idToQueue = 0;
 
-
-pthread_mutex_t* m = NULL;
-pthread_mutex_t m2 = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t* full = NULL;
-pthread_cond_t* empty = NULL;
+pthread_mutex_t exec_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t term_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t dispatch_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void *thread_routine(void *arg)
 {
-    int i= * (int *) arg;
-    while (1) {
-        pthread_mutex_lock(&m[i]);
 
-        while (tqueue[i]->index == 0) { pthread_cond_wait(&empty[i], &m[i]); }
+    int i = * (int *) arg;
+
+    while (1) {
+        pthread_mutex_lock(&tqueue[i]->m);
+
+        while (tqueue[i]->index == 0) {
+            pthread_cond_wait(&tqueue[i]->empty, &tqueue[i]->m);
+        }
 
         active_task = get_task_to_execute(i);
-        pthread_cond_signal(&full[i]);
-        pthread_mutex_unlock(&m[i]);
-        pthread_mutex_lock(&m2);
+        pthread_cond_signal(&tqueue[i]->full);
+        pthread_mutex_unlock(&tqueue[i]->m);
 
         task_return_value_t ret = exec_task(active_task);
         if (ret == TASK_COMPLETED) {
             terminate_task(active_task);
+            pthread_mutex_lock(&exec_mutex);
             sys_state.task_terminated++;
+            pthread_mutex_unlock(&exec_mutex);
         }
 #ifdef WITH_DEPENDENCIES
         else
             active_task->status = WAITING;
 #endif
-       pthread_mutex_unlock(&m2);
     }
+
 }
 
 void create_queues(void)
 {
-    m = (pthread_mutex_t *) malloc(THREAD_COUNT * sizeof(pthread_mutex_t));
-    full = (pthread_cond_t *) malloc(THREAD_COUNT * sizeof(pthread_cond_t));
-    empty = (pthread_cond_t *) malloc(THREAD_COUNT * sizeof(pthread_cond_t));
 
-    tqueue = (tasks_queue_t**) malloc(THREAD_COUNT * sizeof(tasks_queue_t*));
-    for( int i =0; i < THREAD_COUNT; i++){
+    tqueue = (tasks_queue_t **) malloc(THREAD_COUNT * sizeof(tasks_queue_t *));
+    for (int i = 0; i < THREAD_COUNT; i++)
         tqueue[i] = create_tasks_queue();
-    }
+
 }
 
 void delete_queues(void)
@@ -70,9 +70,6 @@ void create_thread_pool(void)
     int *threadIds = (int*) malloc(THREAD_COUNT* sizeof(int));
     for (size_t i = 0; i < THREAD_COUNT; i++)
     {
-        m[i] = (pthread_mutex_t) PTHREAD_MUTEX_INITIALIZER;
-        full[i] = (pthread_cond_t) PTHREAD_COND_INITIALIZER;
-        empty[i] = (pthread_cond_t) PTHREAD_COND_INITIALIZER;
         threadIds[i] = i;
         pthread_create(&tids[i], NULL, thread_routine, &threadIds[i]);
     }
@@ -83,31 +80,33 @@ void create_thread_pool(void)
 void dispatch_task(task_t *t)
 {
 
-    pthread_mutex_lock(&m[idToQueue]);
     int id = idToQueue;
-    idToQueue = (idToQueue +1)%THREAD_COUNT;
-    while (tqueue[id]->index == tqueue[id]->task_buffer_size)
-    {
-    #ifdef WITH_DEPENDENCIES
-    if(t->parent_task != NULL){
-        tqueue[id]->task_buffer_size = tqueue[id]->task_buffer_size*2;
-        tqueue[id]->task_buffer = realloc(tqueue[id]->task_buffer, sizeof(task_t*) * tqueue[id]->task_buffer_size);
-        if(tqueue[id]->task_buffer == NULL){
-            fprintf(stderr, "ERROR: the queue of tasks is full\n");
-            exit(EXIT_FAILURE);
-        }
-    }else{
-    #endif
-        pthread_cond_wait(&full[id], &m[id]);
-    #ifdef WITH_DEPENDENCIES
-    }
-    #endif
 
+    pthread_mutex_lock(&dispatch_mutex);
+    idToQueue = (idToQueue + 1) % THREAD_COUNT;
+    pthread_mutex_unlock(&dispatch_mutex);
+
+    pthread_mutex_lock(&tqueue[id]->m);
+    while (tqueue[id]->index == tqueue[id]->task_buffer_size) {
+#ifdef WITH_DEPENDENCIES
+        if (t->parent_task != NULL) {
+            tqueue[id]->task_buffer_size *= 2;
+            tqueue[id]->task_buffer = realloc(tqueue[id]->task_buffer, sizeof(task_t *) * tqueue[id]->task_buffer_size);
+            if (tqueue[id]->task_buffer == NULL) {
+                fprintf(stderr, "ERROR: the queue of tasks is full\n");
+                exit(EXIT_FAILURE);
+            }
+        } else {
+#endif
+            pthread_cond_wait(&tqueue[id]->full, &tqueue[id]->m);
+#ifdef WITH_DEPENDENCIES
+        }
+#endif
     }
     enqueue_task(tqueue[id], t);
 
-    pthread_cond_signal(&empty[id]);
-    pthread_mutex_unlock(&m[id]);
+    pthread_cond_signal(&tqueue[id]->empty);
+    pthread_mutex_unlock(&tqueue[id]->m);
 
 }
 
@@ -146,8 +145,10 @@ void terminate_task(task_t *t)
 #ifdef WITH_DEPENDENCIES
     if (t->parent_task != NULL) {
         task_t *waiting_task = t->parent_task;
+        pthread_mutex_lock(&term_mutex);
         waiting_task->task_dependency_done++;
         task_check_runnable(waiting_task);
+        pthread_mutex_unlock(&term_mutex);
     }
 #endif
 
