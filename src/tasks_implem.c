@@ -42,6 +42,7 @@ void *thread_routine(void *arg)
 #endif
        pthread_mutex_unlock(&m2);
     }
+}
 
 void create_queues(void)
 {
@@ -110,14 +111,7 @@ void dispatch_task(task_t *t)
 
 }
 
-task_t* get_task_to_execute(int id)
-{
-    return dequeue_task(tqueue[id]);
-}
-
-void dispatch_task(task_t *t) { enqueue_task(tqueue, t); }
-
-task_t *get_task_to_execute(void) { return dequeue_task(tqueue); }
+task_t* get_task_to_execute(int id) { return dequeue_task(tqueue[id]); }
 
 int tasks_completed(void)
 {
