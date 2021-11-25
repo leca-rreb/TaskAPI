@@ -1,7 +1,6 @@
-CC =	gcc
-
-CFLAGS =  -g -Wall -Werror 
-LDFLAGS = -lpthread
+CC		= gcc
+CFLAGS	= -g -Wall -Werror
+LDFLAGS	= -lpthread
 
 ## add the memory sanitizer
 # CFLAGS += -fsanitize=address
@@ -24,21 +23,19 @@ DEPS += Makefile.config
 
 
 ifdef VERBOSE
-ifneq ($(VERBOSE),0)
+ifneq ($(VERBOSE), 0)
 CONFIG_FLAGS += -DVERBOSE=$(VERBOSE)
 endif
 endif
 
 ifdef WITH_DEPENDENCIES
-ifneq ($(WITH_DEPENDENCIES),0)
+ifneq ($(WITH_DEPENDENCIES), 0)
 CONFIG_FLAGS += -DWITH_DEPENDENCIES
 endif
 endif
 
 CONFIG_FLAGS += -DQUEUE_SIZE=$(QUEUE_SIZE)
 CONFIG_FLAGS += -DTHREAD_COUNT=$(THREAD_COUNT)
-
-
 
 all: $(TARGETS)
 
@@ -50,7 +47,6 @@ tests/%.o: tests/%.c $(DEPS)
 
 %.o: %.c $(DEPS)
 	$(CC) -c $< $(CFLAGS) $(CONFIG_FLAGS)
-
 
 clean:
 	rm -rf *.o tests/*.o tests/*.run *~ tests/*~

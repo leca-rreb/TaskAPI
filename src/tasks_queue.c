@@ -3,72 +3,79 @@
 
 #include "tasks_queue.h"
 
-
-tasks_queue_t* create_tasks_queue(void)
+tasks_queue_t *create_tasks_queue(void)
 {
-    tasks_queue_t *q = (tasks_queue_t*) malloc(sizeof(tasks_queue_t));
+
+    tasks_queue_t *q = (tasks_queue_t *) malloc(sizeof(tasks_queue_t));
 
     q->task_buffer_size = QUEUE_SIZE;
-    q->task_buffer = (task_t**) malloc(sizeof(task_t*) * q->task_buffer_size);
-
+    q->task_buffer = (task_t **) malloc(q->task_buffer_size * sizeof(task_t *));
     q->index = 0;
 
     return q;
-}
 
+}
 
 void free_tasks_queue(tasks_queue_t *q)
 {
-    /* IMPORTANT: We chose not to free the queues to simplify the
-     * termination of the program (and make debugging less complex) */
-    
-    /* free(q->task_buffer); */
-    /* free(q); */
-}
 
+    /*
+        IMPORTANT: We chose not to free the queues to simplify the
+        termination of the program (and make debugging less complex).
+    */
+
+    // free(q->task_buffer);
+    // free(q);
+
+}
 
 void enqueue_task(tasks_queue_t *q, task_t *t)
 {
+
     pthread_mutex_lock(&m);
 
-    while (q->index == q->task_buffer_size)
-    {
-    #ifdef WITH_DEPENDENCIES
-    if(t->parent_task != NULL){
-        q->task_buffer_size = q->task_buffer_size*2;
-        q->task_buffer = realloc(q->task_buffer, sizeof(task_t*) * q->task_buffer_size);
-        if(q->task_buffer == NULL){
-            fprintf(stderr, "ERROR: the queue of tasks is full\n");
-            exit(EXIT_FAILURE);
+    while (q->index == q->task_buffer_size) {
+#ifdef WITH_DEPENDENCIES
+        if (t->parent_task != NULL) {
+            q->task_buffer_size *= 2;
+            q->task_buffer =
+            realloc(q->task_buffer, q->task_buffer_size * sizeof(task_t *));
+            if (q->task_buffer == NULL) {
+                PRINT_DEBUG(100, "ERROR: memory allocation of size %d failed.\n", q->task_buffer_size);
+                exit(EXIT_FAILURE);
+            }
+        } else {
+#endif
+            pthread_cond_wait(&full, &m);
+#ifdef WITH_DEPENDENCIES
         }
-    }else{
-    #endif
-        pthread_cond_wait(&full, &m);
-    #ifdef WITH_DEPENDENCIES
+#endif
     }
-    #endif
 
-    }
     q->task_buffer[q->index] = t;
     q->index++;
-        
+
     pthread_cond_signal(&empty);
     pthread_mutex_unlock(&m);
-   /*  if(q->index == q->task_buffer_size){
+    /*
+    if (q->index == q->task_buffer_size) {
         fprintf(stderr, "ERROR: the queue of tasks is full\n");
         exit(EXIT_FAILURE);
-    } */
+    }
+    */
+    return;
+
 }
 
-
-task_t* dequeue_task(tasks_queue_t *q)
+task_t *dequeue_task(tasks_queue_t *q)
 {
-    if(q->index == 0){
+
+    if (q->index == 0)
         return NULL;
-    }
 
     task_t *t = q->task_buffer[q->index-1];
     q->index--;
 
     return t;
+
 }

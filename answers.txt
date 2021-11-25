@@ -1,7 +1,7 @@
 Stage 0:
 -------
 1.a
-	A task is enqueued when it is submitted with the submit_task function. 
+	A task is enqueued when it is submitted with the submit_task function.
 1.b
 	It is dequeued when the task_waitall function is called,
 	that is either at the end of the runtime or when the runtime executes
@@ -23,3 +23,16 @@ Stage 1:
 3. Producer / Consumer
 4. If the queue gets full we should first execute one of the task in it, to allow another one to be put in its place.
 5. When the task queue is empty.
+
+Stage 2:
+--------
+
+1. The resizing of the queue is necessary when the task you want to add is a "child" task and the queue is full.
+   Because the parent task need to wait for its children, we cannot pop it from the queue to add its children in
+   its place. Therefore you need to make more room for the children tasks.
+2. A task is in the WAITING state if its termination depends on its children. It needs to WAIT for its children
+   to terminate before it can resume.
+3. 4 Cases:
+	- TASK_COMPLETED + w/out PARENT: terminates normally.
+	- TASK_COMPLETED + w/ PARENT   : increment parent dependencies done counter & check if parent is runnable.
+	- TASK_TO_BE_RESUMED 		   : put the task to wait
