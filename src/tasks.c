@@ -79,9 +79,12 @@ void submit_task(task_t *t)
 #ifdef WITH_DEPENDENCIES
     if (active_task != NULL) {
         t->parent_task = active_task;
+        pthread_mutex_lock(&exec_mutex);
         active_task->task_dependency_count++;
+
         PRINT_DEBUG(100, "Dependency %u -> %u\n",
             active_task->task_id, t->task_id);
+        pthread_mutex_unlock(&exec_mutex);
     }
 #endif
 
