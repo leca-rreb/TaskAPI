@@ -30,5 +30,7 @@ void *retrieve_output_from_dependencies(task_t *t);
 extern __thread task_t *active_task;
 extern system_state_t sys_state;
 extern pthread_mutex_t exec_mutex;
+extern pthread_mutex_t submit_mutex;
+extern pthread_cond_t waitall_cond;
 
 #endif

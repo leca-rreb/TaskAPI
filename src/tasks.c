@@ -1,5 +1,7 @@
 #include <stdlib.h>
 
+#include <pthread.h>
+
 #include "utils.h"
 #include "debug.h"
 #include "tasks.h"
@@ -7,6 +9,8 @@
 
 system_state_t sys_state;
 __thread task_t *active_task;
+pthread_mutex_t submit_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t waitall_cond = PTHREAD_COND_INITIALIZER;
 
 void runtime_init(void)
 {
@@ -48,8 +52,9 @@ task_t *create_task(task_routine_t f)
 {
 
     task_t *t = malloc(sizeof(task_t));
-
+     pthread_mutex_lock(&submit_mutex);
     t->task_id = ++sys_state.task_counter;
+    pthread_mutex_unlock(&submit_mutex);
     t->fct = f;
     t->step = 0;
 
@@ -75,21 +80,22 @@ void submit_task(task_t *t)
 {
 
     t->status = READY;
-
 #ifdef WITH_DEPENDENCIES
     if (active_task != NULL) {
         t->parent_task = active_task;
-        pthread_mutex_lock(&exec_mutex);
+        pthread_mutex_lock(&submit_mutex);
         active_task->task_dependency_count++;
-
+        pthread_mutex_unlock(&submit_mutex);
         PRINT_DEBUG(100, "Dependency %u -> %u\n",
             active_task->task_id, t->task_id);
-        pthread_mutex_unlock(&exec_mutex);
     }
 #endif
+
 
     dispatch_task(t);
 
 }
 
-void task_waitall(void) { while(!tasks_completed()) {} }
+void task_waitall(void) { while(sys_state.task_terminated != sys_state.task_counter) {
+    pthread_cond_wait(&waitall_cond, &submit_mutex);
+} }
