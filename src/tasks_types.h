@@ -41,6 +41,8 @@ typedef struct task {
     unsigned int task_dependency_count; // Number of tasks this task depends on.
     unsigned int task_dependency_done;  // Number of solved dependencies.
     struct task *parent_task;           // Task that depends on this task.
+    pthread_mutex_t task_m;
+    pthread_cond_t task_cond;
 #endif
 } task_t;
 

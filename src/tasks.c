@@ -81,11 +81,11 @@ void submit_task(task_t *t)
 
     t->status = READY;
 #ifdef WITH_DEPENDENCIES
+    t->task_m = (pthread_mutex_t) PTHREAD_MUTEX_INITIALIZER;
+    t->task_cond = (pthread_cond_t) PTHREAD_COND_INITIALIZER;
     if (active_task != NULL) {
         t->parent_task = active_task;
-        pthread_mutex_lock(&submit_mutex);
         active_task->task_dependency_count++;
-        pthread_mutex_unlock(&submit_mutex);
         PRINT_DEBUG(100, "Dependency %u -> %u\n",
             active_task->task_id, t->task_id);
     }

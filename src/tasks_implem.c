@@ -11,8 +11,7 @@
 pthread_t tids[THREAD_COUNT];
 tasks_queue_t **tqueue = NULL;
 int idToQueue = 0;
-__thread int tid;
-pthread_mutex_t exec_mutex = PTHREAD_MUTEX_INITIALIZER;
+__thread int tid = 0;
 pthread_mutex_t dispatch_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void *thread_routine(void *arg)
@@ -23,13 +22,38 @@ void *thread_routine(void *arg)
     while (1) {
         pthread_mutex_lock(&tqueue[tid]->m);
 
-        while (tqueue[tid]->index == 0) {
-            pthread_cond_wait(&tqueue[tid]->empty, &tqueue[tid]->m);
+        if (tqueue[tid]->index == tqueue[tid]->begin_index) {
+            while(all_queue_empty()){
+                pthread_cond_wait(&tqueue[tid]->empty, &tqueue[tid]->m);
+            }
+            pthread_mutex_unlock(&tqueue[tid]->m);
+            
+            int id = idToQueue;
+            pthread_mutex_lock(&tqueue[id]->m);
+            while(tqueue[id]->index == tqueue[id]->begin_index){
+                pthread_mutex_unlock(&tqueue[id]->m);
+                pthread_mutex_lock(&dispatch_mutex);
+                while(idToQueue == tid){
+                    idToQueue = (idToQueue + 1) % THREAD_COUNT;
+                }
+                pthread_mutex_unlock(&dispatch_mutex);
+                id = idToQueue;
+                pthread_mutex_lock(&tqueue[id]->m);
+            }
+            active_task = steal_task_to_execute(id);
+            
+            pthread_cond_signal(&tqueue[id]->full);
+            pthread_mutex_unlock(&tqueue[id]->m);
+            //printf("QUEUE : %i task: %i \n", id, t->task_id);
+    
+        }else{
+             active_task = get_task_to_execute(tid);
+             pthread_cond_signal(&tqueue[tid]->full);
+             pthread_mutex_unlock(&tqueue[tid]->m);
         }
+       
 
-        active_task = get_task_to_execute(tid);
-        pthread_cond_signal(&tqueue[tid]->full);
-        pthread_mutex_unlock(&tqueue[tid]->m);
+       
 
         task_return_value_t ret = exec_task(active_task);
         if (ret == TASK_COMPLETED) {
@@ -45,8 +69,8 @@ void *thread_routine(void *arg)
         }
 #ifdef WITH_DEPENDENCIES
         else{
-
             active_task->status = WAITING;
+            pthread_cond_signal(&active_task->task_cond);
         }
 #endif
     }
@@ -55,7 +79,6 @@ void *thread_routine(void *arg)
 
 void create_queues(void)
 {
-
     tqueue = (tasks_queue_t **) malloc(THREAD_COUNT * sizeof(tasks_queue_t *));
     for (int i = 0; i < THREAD_COUNT; i++)
         tqueue[i] = create_tasks_queue();
@@ -86,42 +109,40 @@ void create_thread_pool(void)
 void dispatch_task(task_t *t)
 {
 
-    int id = idToQueue;
-    //printf("QUEUE : %i task: %i \n", id, t->task_id);
-    pthread_mutex_lock(&dispatch_mutex);
-    idToQueue = (idToQueue + 1) % THREAD_COUNT;
-    pthread_mutex_unlock(&dispatch_mutex);
+    //printf("%i", tid);
 
-    pthread_mutex_lock(&tqueue[id]->m);
-    while (tqueue[id]->index == tqueue[id]->task_buffer_size) {
+    pthread_mutex_lock(&tqueue[tid]->m);
+    while (tqueue[tid]->index == tqueue[tid]->task_buffer_size) {
         
 #ifdef WITH_DEPENDENCIES
         if (t->parent_task != NULL) {
-            tqueue[id]->task_buffer_size *= 2;
-            tqueue[id]->task_buffer = realloc(tqueue[id]->task_buffer, sizeof(task_t *) * tqueue[id]->task_buffer_size);
-            if(tqueue[id]->task_buffer == NULL){
+            tqueue[tid]->task_buffer_size *= 2;
+            tqueue[tid]->task_buffer = realloc(tqueue[tid]->task_buffer, sizeof(task_t *) * tqueue[tid]->task_buffer_size);
+            if(tqueue[tid]->task_buffer == NULL){
                 fprintf(stderr, "ERROR: the queue of tasks is full\n");
                 exit(EXIT_FAILURE);
             }
         } else {
 #endif
-            pthread_cond_wait(&tqueue[id]->full, &tqueue[id]->m);
+            pthread_cond_wait(&tqueue[tid]->full, &tqueue[tid]->m);
 #ifdef WITH_DEPENDENCIES
         }
 #endif
     }
-    enqueue_task(tqueue[id], t);
+    enqueue_task(tqueue[tid], t);
 
-    pthread_cond_signal(&tqueue[id]->empty);
-    pthread_mutex_unlock(&tqueue[id]->m);
+    pthread_cond_signal(&tqueue[tid]->empty);
+    pthread_mutex_unlock(&tqueue[tid]->m);
 
 }
 
 task_t* get_task_to_execute(int id) { return dequeue_task(tqueue[id]); }
 
+task_t* steal_task_to_execute(int id) { return dequeue_task_b(tqueue[id]); }
+
 int all_queue_empty(){
     for(int i =0 ; i < THREAD_COUNT; i++){
-        if(tqueue[i]->index !=0){
+        if(tqueue[i]->index != tqueue[i]->begin_index ){
             return 0;
         }
     }
@@ -158,14 +179,14 @@ void terminate_task(task_t *t)
     if (t->parent_task != NULL) {
         
         task_t *waiting_task = t->parent_task;
-        
+        pthread_mutex_lock(&waiting_task->task_m);
         while(waiting_task->status !=WAITING){
-
+            pthread_cond_wait(&waiting_task->task_cond, &waiting_task->task_m);
         }
-        pthread_mutex_lock(&exec_mutex);
         waiting_task->task_dependency_done++;
+        pthread_mutex_unlock(&waiting_task->task_m);
         task_check_runnable(waiting_task);
-        pthread_mutex_unlock(&exec_mutex);
+        
        
         
         

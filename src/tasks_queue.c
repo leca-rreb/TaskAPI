@@ -11,6 +11,7 @@ tasks_queue_t *create_tasks_queue(void)
     q->task_buffer_size = QUEUE_SIZE;
     q->task_buffer = (task_t **) malloc(q->task_buffer_size * sizeof(task_t *));
     q->index = 0;
+    q->begin_index = 0;
     q->m = (pthread_mutex_t) PTHREAD_MUTEX_INITIALIZER;
     q->full = (pthread_cond_t) PTHREAD_COND_INITIALIZER;
     q->empty = (pthread_cond_t) PTHREAD_COND_INITIALIZER;
@@ -50,11 +51,24 @@ void enqueue_task(tasks_queue_t *q, task_t *t)
 task_t *dequeue_task(tasks_queue_t *q)
 {
 
-    if (q->index == 0)
+    if (q->index == q->begin_index)
         return NULL;
 
     task_t *t = q->task_buffer[q->index-1];
     q->index--;
+
+    return t;
+
+}
+
+task_t *dequeue_task_b(tasks_queue_t *q)
+{
+
+    if (q->index == q->begin_index)
+        return NULL;
+
+    task_t *t = q->task_buffer[q->begin_index];
+    q->begin_index++;
 
     return t;
 
